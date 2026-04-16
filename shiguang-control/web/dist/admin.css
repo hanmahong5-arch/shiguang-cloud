@@ -1,0 +1,231 @@
+:root {
+  --bg: #0f141e;
+  --panel: rgba(20, 26, 38, 0.8);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e6e8eb;
+  --text-dim: #8892a5;
+  --accent: #4f8ef7;
+  --danger: #ff6b6b;
+  --ok: #5ad07a;
+  color-scheme: dark;
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+}
+* { box-sizing: border-box; }
+html, body, #app { margin: 0; padding: 0; min-height: 100vh; }
+body {
+  background:
+    radial-gradient(circle at 20% 30%, rgba(79, 142, 247, 0.08), transparent 60%),
+    radial-gradient(circle at 80% 80%, rgba(255, 200, 100, 0.05), transparent 50%),
+    var(--bg);
+}
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 220px;
+  background: rgba(0, 0, 0, 0.3);
+  border-right: 1px solid var(--border);
+  padding: 24px 0;
+}
+.sidebar .logo {
+  padding: 0 24px 24px 24px;
+  font-size: 16px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 2px;
+}
+.sidebar .nav { padding: 16px 0; }
+.sidebar .nav-item {
+  display: block;
+  padding: 10px 24px;
+  color: var(--text-dim);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 13px;
+}
+.sidebar .nav-item:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); }
+.sidebar .nav-item.active {
+  background: rgba(79, 142, 247, 0.1);
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+}
+.main {
+  flex: 1;
+  padding: 30px 40px;
+  overflow: auto;
+}
+.main h1 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text);
+}
+.main .subtitle {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.card h3 {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--text-dim);
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.stat-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+}
+.stat-box .label {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+.stat-box .value {
+  font-size: 32px;
+  color: var(--text);
+  font-weight: 300;
+  margin-top: 4px;
+}
+.stat-box .hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th, td {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+}
+th { color: var(--text-dim); font-weight: 500; font-size: 12px; }
+td { color: var(--text); }
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 5px;
+  transition: all 0.15s;
+}
+button.primary {
+  background: linear-gradient(135deg, #4f8ef7, #3b6dc9);
+  color: #fff;
+}
+button.primary:hover { filter: brightness(1.1); }
+button.danger {
+  background: rgba(255, 107, 107, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+button.danger:hover { background: rgba(255, 107, 107, 0.25); }
+button.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+button.secondary:hover { background: rgba(255, 255, 255, 0.12); }
+
+input, select, textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+input:focus { border-color: var(--accent); }
+
+.row { display: flex; gap: 10px; align-items: center; }
+
+/* login */
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-card {
+  width: 340px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 28px;
+}
+.login-card h2 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  color: var(--text);
+  text-align: center;
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+.login-card .sub {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+.login-card .field { margin-bottom: 12px; }
+.login-card .field label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.login-card .field input { width: 100%; padding: 10px 12px; }
+.login-card button { width: 100%; padding: 12px; margin-top: 8px; }
+.error-msg {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 100, 100, 0.15);
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  border-radius: 4px;
+  color: #ffb3b3;
+  font-size: 12px;
+}
+.ok-msg {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(90, 208, 122, 0.1);
+  border: 1px solid rgba(90, 208, 122, 0.25);
+  border-radius: 4px;
+  color: #a8e5b7;
+  font-size: 12px;
+}
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-dim);
+}
+pre {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  overflow: auto;
+  color: #a8b1c0;
+  max-height: 400px;
+}

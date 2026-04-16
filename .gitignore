@@ -1,0 +1,52 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build output
+shiguang-launcher/frontend/dist/
+shiguang-hub/admin-spa/dist/
+shiguang-hub/admin-spa/node_modules/
+shiguang-launcher/frontend/node_modules/
+
+# Wails build
+shiguang-launcher/build/bin/
+
+# Temp scaffolds
+tmp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+test-*/
+*.tmp
+
+# Ban persistence
+*-bans.json
+
+# Session tokens
+.sg-session
+
+# Patch manifests (generated)
+manifest.json
+
+# Secrets & runtime state
+.env
+.env.*
+*.pem
+*.key
+.sg-tokens.json
+logs/
+
+# Go debug
+__debug_bin*

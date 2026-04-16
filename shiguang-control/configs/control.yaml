@@ -1,0 +1,47 @@
+# Shiguang Control Center configuration.
+#
+# Deploy locations:
+#   Windows Service: "ShiguangControl"
+#   Port 10443 (HTTPS) bound on ALL interfaces so admins can reach the SPA.
+#
+# IMPORTANT — production deployment checklist:
+#   1. Replace jwt.secret with a 32+ char random string
+#   2. Replace launcher.public_gate_ip with the gate's public IP
+#   3. Point tls.cert_file / tls.key_file at real Let's Encrypt certs
+#   4. Ensure PostgreSQL at 127.0.0.1:5432 has both schemas populated
+
+bind: "0.0.0.0:10443"
+
+# tls: (optional; omit for HTTP dev mode)
+#   cert_file: "cert/fullchain.pem"
+#   key_file:  "cert/privkey.pem"
+
+jwt:
+  secret: "CHANGE_ME_BEFORE_DEPLOYMENT_32_RANDOM_CHARS_MIN"
+  issuer: "shiguang-control"
+  ttl_days: 7
+
+db_58: "postgres://postgres:postgres@127.0.0.1:5432/aion_world_live?sslmode=disable"
+db_48: "postgres://postgres:postgres@127.0.0.1:5432/al_server_ls?sslmode=disable"
+
+gates:
+  - name: "gate-58"
+    url:  "http://127.0.0.1:9090"
+  - name: "gate-48"
+    url:  "http://127.0.0.1:9091"
+
+launcher:
+  public_gate_ip: "127.0.0.1"   # change to gate's public IP in production
+  patch_manifest_url: "https://example.com/patches/manifest.json"
+  news_url: "https://example.com/news"
+  servers:
+    - id: "5.8"
+      name: "AionCore 5.8"
+      auth_port: 2108
+      game_args: "-cc:5 -lang:chs -noauthgg -noweb -nb -gv -megaphone -multithread -charnamemenu"
+      client_path: ""
+    - id: "4.8"
+      name: "Beyond 4.8"
+      auth_port: 2107
+      game_args: "-cc:5 -lang:chs -noauthgg -noweb -nb -gv -megaphone -multithread -charnamemenu"
+      client_path: ""

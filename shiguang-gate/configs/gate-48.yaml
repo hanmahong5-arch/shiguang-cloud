@@ -1,0 +1,35 @@
+# Shiguang Gate configuration for the 4.8 service line (Beyond Java).
+# Deploy as a separate process from gate-58.yaml for fault isolation.
+#
+# Required server-side prerequisite:
+#   Beyond 4.8 NioServer must be patched to read PROXY Protocol v2 headers
+#   BEFORE the first read handler is attached. See doc/active_task.md Phase 1.
+
+instance: "gate-48"
+admin_http: "127.0.0.1:9091"
+banlist_file: "gate-48-bans.json"
+
+defaults:
+  max_conn_per_ip: 3
+  rate_per_sec: 5
+  burst: 10
+  dial_timeout_ms: 5000
+
+routes:
+  # Upstream ports are the internal +10000 variants each Beyond process
+  # actually binds (LS 12107, GS 17778, CS 20241). Keep them in sync with
+  # prod/<server>/config/network/network.properties:socket_address.
+  - name: "4.8-login"
+    listen: "0.0.0.0:2107"
+    upstream: "127.0.0.1:12107"
+    proxy_protocol: true
+
+  - name: "4.8-game"
+    listen: "0.0.0.0:7778"
+    upstream: "127.0.0.1:17778"
+    proxy_protocol: true
+
+  - name: "4.8-chat"
+    listen: "0.0.0.0:10241"
+    upstream: "127.0.0.1:20241"
+    proxy_protocol: true

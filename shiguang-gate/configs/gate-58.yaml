@@ -1,0 +1,27 @@
+# Shiguang Gate configuration for the 5.8 service line (AionCore C++).
+# Deploy as a separate process from gate-48.yaml for fault isolation.
+#
+# Required server-side prerequisite:
+#   AionCore must be patched to read PROXY Protocol v2 headers BEFORE
+#   sending its S_INIT handshake. See doc/active_task.md Phase 1.
+
+instance: "gate-58"
+admin_http: "127.0.0.1:9090"
+banlist_file: "gate-58-bans.json"
+
+defaults:
+  max_conn_per_ip: 3
+  rate_per_sec: 5
+  burst: 10
+  dial_timeout_ms: 5000
+
+routes:
+  - name: "5.8-auth"
+    listen: "0.0.0.0:2108"
+    upstream: "127.0.0.1:2108"
+    proxy_protocol: true
+
+  - name: "5.8-world"
+    listen: "0.0.0.0:7777"
+    upstream: "127.0.0.1:7777"
+    proxy_protocol: true

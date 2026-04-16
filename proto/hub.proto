@@ -1,0 +1,173 @@
+// Hub-Spoke gRPC protocol for ShiguangCloud.
+//
+// The Gate Agent (spoke) connects to Hub (cloud) via a long-lived bidirectional
+// gRPC stream. This stream carries:
+//   Agent → Hub: heartbeat, metrics, events (player login/logout)
+//   Hub → Agent: ban/unban, kick, config hot-push, announcements
+//
+// Game traffic (TCP packets) NEVER flows through this channel — only the
+// control plane does. This is the foundational design principle.
+
+syntax = "proto3";
+
+package shiguang.hub.v1;
+
+option go_package = "github.com/shiguang/shared/hubpb";
+
+// ============================================================
+// Service: bidirectional stream + config fetch
+// ============================================================
+
+service AgentHub {
+  // Long-lived bidirectional stream.
+  // Agent sends reports; Hub sends commands on the same stream.
+  rpc ReportStream(stream AgentReport) returns (stream HubCommand);
+
+  // One-shot config pull on agent startup (before opening ReportStream).
+  rpc FetchConfig(ConfigRequest) returns (AgentConfig);
+
+  // Called by Hub's REST layer when an operator hits "ban IP" in the dashboard.
+  // This is an internal RPC, not exposed to agents.
+  rpc PushCommand(PushCommandRequest) returns (PushCommandResponse);
+}
+
+// ============================================================
+// Agent → Hub messages
+// ============================================================
+
+message AgentReport {
+  string agent_token = 1;
+
+  oneof payload {
+    Heartbeat heartbeat = 2;
+    MetricsBatch metrics = 3;
+    PlayerEvent event = 4;
+  }
+}
+
+message Heartbeat {
+  string hostname = 1;
+  string public_ip = 2;
+  string version = 3;
+  string status = 4;    // "online" | "degraded"
+  string uptime = 5;
+  repeated RouteSnapshot routes = 6;
+  int32 ban_count = 7;
+}
+
+message RouteSnapshot {
+  string name = 1;
+  int64 active = 2;
+  uint64 accepted = 3;
+  uint64 rejected = 4;
+}
+
+message MetricsBatch {
+  repeated MetricPoint points = 1;
+}
+
+message MetricPoint {
+  string name = 1;    // "online_count", "login", "register"
+  int64 value = 2;
+  string server = 3;  // "5.8" or "4.8"
+  int64 timestamp_ms = 4;
+}
+
+message PlayerEvent {
+  string type = 1;     // "login" | "logout" | "register"
+  string account = 2;
+  string server = 3;
+  string ip = 4;
+  int64 timestamp_ms = 5;
+}
+
+// ============================================================
+// Hub → Agent commands
+// ============================================================
+
+message HubCommand {
+  oneof command {
+    BanIP ban_ip = 1;
+    UnbanIP unban_ip = 2;
+    KickPlayer kick_player = 3;
+    ConfigUpdate config_update = 4;
+    Announcement announcement = 5;
+  }
+}
+
+message BanIP {
+  string ip = 1;
+  string reason = 2;
+  int64 duration_ms = 3;  // 0 = permanent
+}
+
+message UnbanIP {
+  string ip = 1;
+}
+
+message KickPlayer {
+  string account = 1;
+  string reason = 2;
+}
+
+message ConfigUpdate {
+  string reason = 1;
+  // Agent should call FetchConfig to get the latest config.
+}
+
+message Announcement {
+  string message = 1;
+  string severity = 2;  // "info" | "warning" | "maintenance"
+}
+
+// ============================================================
+// Config fetch (one-shot RPC)
+// ============================================================
+
+message ConfigRequest {
+  string agent_token = 1;
+  string current_config_hash = 2;  // SHA-256 of current config (for change detection)
+}
+
+message AgentConfig {
+  string tenant_id = 1;
+  string tenant_slug = 2;
+  string public_gate_ip = 3;
+  repeated ServerLineConfig servers = 4;
+  string patch_manifest_url = 5;
+  string news_url = 6;
+  BrandingConfig branding = 7;
+  bytes config_hash = 8;
+}
+
+message ServerLineConfig {
+  string id = 1;
+  string name = 2;
+  string version = 3;     // "5.8" or "4.8"
+  int32 auth_port = 4;
+  int32 game_port = 5;
+  int32 chat_port = 6;
+  string game_args = 7;
+}
+
+message BrandingConfig {
+  string server_name = 1;
+  string logo_url = 2;
+  string bg_url = 3;
+  string accent_color = 4;
+  string text_color = 5;
+}
+
+// ============================================================
+// Internal: Hub REST → gRPC bridge
+// ============================================================
+
+message PushCommandRequest {
+  string tenant_id = 1;
+  HubCommand command = 2;
+}
+
+message PushCommandResponse {
+  bool delivered = 1;
+  string error = 2;
+}

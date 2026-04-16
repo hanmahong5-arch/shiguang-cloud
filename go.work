@@ -1,0 +1,10 @@
+go 1.25.0
+
+use (
+	./shared
+	./shiguang-agent
+	./shiguang-control
+	./shiguang-gate
+	./shiguang-hub
+	./shiguang-launcher
+)

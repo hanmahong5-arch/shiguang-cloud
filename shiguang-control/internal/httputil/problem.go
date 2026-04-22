@@ -34,6 +34,10 @@ type ProblemOpts struct {
 
 // Problem 写入一个 RFC 7807 application/problem+json 响应。
 // 若 Status 为零则默认 500。
+//
+// 注：必须使用 c.JSON() 的第二参数指定 Content-Type —— 若先调 c.Set()
+// 再调 c.JSON()，JSON 会内部覆盖 Content-Type 为 application/json，
+// 导致 RFC 7807 的 mediatype 丢失。
 func Problem(c *fiber.Ctx, o ProblemOpts) error {
 	if o.Status == 0 {
 		o.Status = fiber.StatusInternalServerError
@@ -41,8 +45,7 @@ func Problem(c *fiber.Ctx, o ProblemOpts) error {
 	if o.Type == "" {
 		o.Type = "about:blank"
 	}
-	c.Set("Content-Type", "application/problem+json")
-	return c.Status(o.Status).JSON(o)
+	return c.Status(o.Status).JSON(o, "application/problem+json")
 }
 
 // NotFound 返回 404 Problem。

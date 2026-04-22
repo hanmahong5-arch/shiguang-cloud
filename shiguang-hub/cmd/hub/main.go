@@ -23,6 +23,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/google/uuid"
 
 	"github.com/shiguang/hub/handlers"
 	"github.com/shiguang/hub/hubconfig"
@@ -73,10 +74,38 @@ func main() {
 	app := fiber.New(fiber.Config{
 		AppName:               "shiguang-hub",
 		DisableStartupMessage: true,
-		ReadTimeout:           10e9,
+		ReadTimeout:           10e9,  // 10 s
+		WriteTimeout:          30e9,  // 30 s — 覆盖慢响应（patch 上传等）
+		IdleTimeout:           120e9, // 120 s — 保持 keep-alive
 	})
 	app.Use(fiberrecover.New())
+
+	// Request ID：每请求 UUID 写入 X-Request-Id 并存入 Locals 供 logger 读取
+	app.Use(func(c *fiber.Ctx) error {
+		rid := c.Get("X-Request-Id")
+		if rid == "" {
+			rid = uuid.New().String()
+		}
+		c.Locals("requestid", rid)
+		c.Set("X-Request-Id", rid)
+		return c.Next()
+	})
+
 	app.Use(fiberlogger.New())
+
+	// Security Headers：与 shiguang-control 对齐，防点击劫持 / MIME 嗅探 / XSS
+	app.Use(func(c *fiber.Ctx) error {
+		c.Set("X-Content-Type-Options", "nosniff")
+		c.Set("X-Frame-Options", "DENY")
+		c.Set("X-XSS-Protection", "1; mode=block")
+		c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		if cfg.TLS != nil && cfg.TLS.CertFile != "" {
+			c.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+		}
+		return c.Next()
+	})
+
 	app.Use(cors.New(cors.Config{
 		AllowOriginsFunc: func(origin string) bool {
 			// Allow requests with no origin (server-to-server, curl, etc.)
@@ -144,6 +173,10 @@ func main() {
 	}
 	slog.Info("gRPC AgentHub started", "bind", grpcBind)
 
+	// Lightweight probes（与 control 对齐，秒级响应，适合 LB TCP 探针）
+	app.Get("/readyz", func(c *fiber.Ctx) error { return c.SendString("ok") })
+	app.Get("/livez", func(c *fiber.Ctx) error { return c.SendString("ok") })
+
 	// Health check — pings DB, reports gRPC agent count, returns 503 if critical deps are down
 	app.Get("/healthz", func(c *fiber.Ctx) error {
 		httpStatus := fiber.StatusOK
@@ -167,17 +200,14 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
 		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				purgeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				n, err := repo.PurgeExpiredTokens(purgeCtx)
-				cancel()
-				if err != nil {
-					slog.Error("token purge failed", "err", err)
-				} else if n > 0 {
-					slog.Info("expired tokens purged", "count", n)
-				}
+		for range ticker.C {
+			purgeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			n, err := repo.PurgeExpiredTokens(purgeCtx)
+			cancel()
+			if err != nil {
+				slog.Error("token purge failed", "err", err)
+			} else if n > 0 {
+				slog.Info("expired tokens purged", "count", n)
 			}
 		}
 	}()

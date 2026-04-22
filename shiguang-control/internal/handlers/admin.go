@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -73,7 +74,14 @@ func (h *AdminHandler) login(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid JSON")
 	}
-	if req.Username != h.adminUser || req.Password != h.adminPass {
+	// SECURITY (P1, timing attack): use constant-time compare for both
+	// username and password. A plain != leaks string length and common prefix
+	// through response timing, which over enough samples lets an attacker
+	// recover the admin credentials. ConstantTimeCompare returns 1 only when
+	// the two byte slices are equal AND the same length.
+	userOK := subtle.ConstantTimeCompare([]byte(req.Username), []byte(h.adminUser)) == 1
+	passOK := subtle.ConstantTimeCompare([]byte(req.Password), []byte(h.adminPass)) == 1
+	if !userOK || !passOK {
 		return fiber.NewError(fiber.StatusUnauthorized, "invalid credentials")
 	}
 	token, err := middleware.Issue(h.jwtCfg, req.Username)

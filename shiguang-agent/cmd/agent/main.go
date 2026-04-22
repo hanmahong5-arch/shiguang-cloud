@@ -311,14 +311,24 @@ func loadConfig(path string) (*AgentConfig, error) {
 	if cfg.Control.Bind == "" {
 		cfg.Control.Bind = "0.0.0.0:10443"
 	}
+	// SECURITY (P1, insecure default fallback): previously an empty JWTSecret
+	// was silently replaced with "default-insecure-secret-change-me", which
+	// meant a misconfigured agent would still boot with a predictable signing
+	// key — trivially forgeable admin tokens. Now we refuse to start; ops
+	// must supply a strong secret (>=32 chars) explicitly.
 	if cfg.Control.JWTSecret == "" {
-		cfg.Control.JWTSecret = "default-insecure-secret-change-me"
+		return nil, fmt.Errorf("control.jwt_secret required (>=32 chars; generate with `openssl rand -hex 32`)")
+	}
+	if len(cfg.Control.JWTSecret) < 32 {
+		return nil, fmt.Errorf("control.jwt_secret must be at least 32 characters (HS256 security floor)")
 	}
 	if cfg.Control.AdminUser == "" {
 		cfg.Control.AdminUser = "admin"
 	}
+	// Admin password: same reasoning as JWT secret. "changeme" is worse than
+	// no default because it ships an identical credential to every tenant.
 	if cfg.Control.AdminPass == "" {
-		cfg.Control.AdminPass = "changeme"
+		return nil, fmt.Errorf("control.admin_pass required (no default — pick a strong password per tenant)")
 	}
 	if cfg.Gate.BanlistFile == "" {
 		cfg.Gate.BanlistFile = cfg.TenantSlug + "-bans.json"

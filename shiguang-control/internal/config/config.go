@@ -75,8 +75,11 @@ func (c *Config) validate() error {
 	if c.Bind == "" {
 		return fmt.Errorf("bind required")
 	}
-	if c.JWT.Secret == "" || len(c.JWT.Secret) < 16 {
-		return fmt.Errorf("jwt.secret must be at least 16 characters")
+	// SECURITY (P1, weak JWT key): HS256 with <32 bytes of entropy is below
+	// NIST SP 800-107 recommendation for HMAC keys tied to SHA-256. 32 chars
+	// of random input gives ~190 bits; well above the 128-bit safety floor.
+	if c.JWT.Secret == "" || len(c.JWT.Secret) < 32 {
+		return fmt.Errorf("jwt.secret must be at least 32 characters (HS256 security floor)")
 	}
 	if c.JWT.TTLDays <= 0 {
 		c.JWT.TTLDays = 7

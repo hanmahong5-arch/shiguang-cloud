@@ -20,7 +20,7 @@ func TestConfig_LoadValid(t *testing.T) {
 	yaml := `
 bind: "0.0.0.0:10443"
 jwt:
-  secret: "a_very_long_secret_string_123"
+  secret: "a_very_long_secret_string_for_tests_xx"
   issuer: "test"
   ttl_days: 7
 db_58: "postgres://x"
@@ -75,7 +75,7 @@ func TestConfig_MissingGateIPRejected(t *testing.T) {
 	yaml := `
 bind: "0.0.0.0:10443"
 jwt:
-  secret: "a_very_long_secret_string_123"
+  secret: "a_very_long_secret_string_for_tests_xx"
   ttl_days: 7
 launcher:
   public_gate_ip: ""
@@ -95,7 +95,7 @@ func TestConfig_Defaults(t *testing.T) {
 	yaml := `
 bind: "0.0.0.0:10443"
 jwt:
-  secret: "a_very_long_secret_string_123"
+  secret: "a_very_long_secret_string_for_tests_xx"
 launcher:
   public_gate_ip: "1.2.3.4"
   servers:

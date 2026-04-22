@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
@@ -30,6 +31,7 @@ import (
 	"github.com/shiguang/control/internal/config"
 	"github.com/shiguang/control/internal/handlers"
 	"github.com/shiguang/control/internal/hub"
+	"github.com/shiguang/control/internal/httputil"
 	"github.com/shiguang/control/internal/metrics"
 	"github.com/shiguang/control/internal/middleware"
 	"github.com/shiguang/control/internal/service"
@@ -94,12 +96,28 @@ func main() {
 	go h.Run()
 
 	// ── fiber app ──────────────────────────────────────────────────────────
+	// 全局 ErrorHandler：把所有 fiber.NewError / panic 转为 RFC 7807 Problem，
+	// 统一 API 错误格式。handler 内显式调用 httputil.* 的响应不受影响
+	// （已经写 response body，不会进入 ErrorHandler）。
 	app := fiber.New(fiber.Config{
 		AppName:               "shiguang-control",
 		DisableStartupMessage: false,
 		ReadTimeout:           10e9,          // 10 s — max time to read full request body
 		WriteTimeout:          30e9,          // 30 s — covers slow /healthz deep-probes
 		IdleTimeout:           120e9,         // 120 s — keep-alive connections (launcher long-poll)
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			code := fiber.StatusInternalServerError
+			msg := err.Error()
+			if e, ok := err.(*fiber.Error); ok {
+				code = e.Code
+				msg = e.Message
+			}
+			return httputil.Problem(c, httputil.ProblemOpts{
+				Status: code,
+				Title:  http.StatusText(code),
+				Detail: msg,
+			})
+		},
 	})
 	app.Use(recover.New())
 
@@ -252,10 +270,14 @@ func main() {
 			status["db_48"] = "not_configured"
 		}
 
-		// Check gate connectivity
+		// Check gate connectivity.
+		// SECURITY (P2, slow-loris DoS on probe path): use a bounded-timeout
+		// client so a hung/slow gate can't tie up the /healthz worker
+		// indefinitely. Bare http.Get uses http.DefaultClient (no timeout).
 		gateStatus := make(map[string]string)
+		gateProbe := &http.Client{Timeout: 3 * time.Second}
 		for _, g := range cfg.Gates {
-			resp, err := http.Get(g.URL + "/healthz")
+			resp, err := gateProbe.Get(g.URL + "/healthz")
 			if err != nil {
 				gateStatus[g.Name] = "unreachable"
 			} else {

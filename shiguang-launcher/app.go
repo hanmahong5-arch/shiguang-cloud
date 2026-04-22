@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	runtimePkg "runtime"
 	"sync"
 	"time"
 
@@ -17,6 +18,21 @@ import (
 	"github.com/shiguang/launcher/internal/game"
 	"github.com/shiguang/launcher/internal/patching"
 )
+
+// Version 语义化版本号，CI 可通过 -ldflags "-X main.Version=..." 覆盖。
+// 前端通过 GetVersion() 查询。
+var Version = "0.2.0-dev"
+
+// BuildTime 可在构建时由 CI 注入（-ldflags "-X main.BuildTime=2026-04-15T12:34:56Z"）。
+var BuildTime = ""
+
+// VersionInfo 供前端展示 About 卡片使用。
+type VersionInfo struct {
+	Version   string `json:"version"`
+	BuildTime string `json:"build_time"`
+	GoVersion string `json:"go_version"`
+	Platform  string `json:"platform"`
+}
 
 // App is the Wails bound struct. All exported methods become JS functions
 // on the frontend via `window.go.main.App.*`.
@@ -156,6 +172,17 @@ func (a *App) GetPrefs() *Prefs {
 	return a.prefs
 }
 
+// GetVersion 返回启动器自身的版本信息，供前端 About 卡片展示。
+// Version / BuildTime 在构建时由 ldflags 注入，未注入则使用包级默认值。
+func (a *App) GetVersion() VersionInfo {
+	return VersionInfo{
+		Version:   Version,
+		BuildTime: BuildTime,
+		GoVersion: runtimePkg.Version(),
+		Platform:  runtimePkg.GOOS + "/" + runtimePkg.GOARCH,
+	}
+}
+
 // FetchLauncherConfig pulls the hot-edited launcher config from control.
 //
 // Retrieval strategy:
@@ -171,12 +198,15 @@ func (a *App) FetchLauncherConfig() (*control.LauncherConfig, error) {
 	defer cancel()
 
 	var lastErr error
+retry:
 	for i := 0; i < maxAttempts; i++ {
 		if i > 0 {
 			select {
 			case <-ctx.Done():
+				// 父 context 超时：立即退出重试循环，break retry 才能跳出 for
+				// （普通 break 只跳出 select，会继续下一轮重试并覆盖 lastErr）
 				lastErr = ctx.Err()
-				break
+				break retry
 			case <-time.After(backoffs[i]):
 			}
 		}

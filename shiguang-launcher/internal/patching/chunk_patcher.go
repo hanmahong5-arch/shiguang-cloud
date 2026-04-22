@@ -35,6 +35,38 @@ const (
 	chunkRetryBase = 500 * time.Millisecond
 )
 
+// safeChunkPath rejects manifest-supplied relative paths that would escape
+// the client root. Rules:
+//   - Must not be empty.
+//   - Must not be absolute (filepath.IsAbs catches "/x" and "C:\\x").
+//   - Must not contain ".." segments after normalisation.
+//   - Must not contain NUL bytes (Windows/NTFS may silently truncate).
+//
+// Accepts both forward and backslash separators so cross-platform manifests
+// (built on Linux, applied on Windows) still work.
+func safeChunkPath(rel string) error {
+	if rel == "" {
+		return fmt.Errorf("empty path")
+	}
+	if strings.ContainsRune(rel, 0) {
+		return fmt.Errorf("contains NUL byte")
+	}
+	// Normalise separators then use filepath.Clean to collapse ".." / ".".
+	norm := filepath.Clean(filepath.FromSlash(rel))
+	if filepath.IsAbs(norm) {
+		return fmt.Errorf("absolute path")
+	}
+	// After Clean, any surviving ".." must be a prefix — means it escapes root.
+	if norm == ".." || strings.HasPrefix(norm, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("path escapes root via '..'")
+	}
+	// Windows drive-relative shorthand like "C:foo" — Clean doesn't flag it.
+	if len(norm) >= 2 && norm[1] == ':' {
+		return fmt.Errorf("contains drive letter")
+	}
+	return nil
+}
+
 // RunChunked attempts chunk-based patching. Returns ErrNoChunkManifest if
 // the remote server doesn't publish a chunk manifest, allowing the caller
 // to fall back to legacy file-level patching.
@@ -227,7 +259,22 @@ func (p *Patcher) downloadAndWriteChunk(
 	}
 
 	// Write chunk at correct file offset (serialize per-file)
+	// SECURITY (P0, path traversal): c.Path comes from a remote manifest the
+	// launcher fetched over the network. A malicious patch server could embed
+	// "..\\..\\windows\\system32\\x.dll" to escape clientRoot and overwrite
+	// arbitrary files. We enforce two rules:
+	//   1. Reject any path containing "..", absolute paths, or drive letters.
+	//   2. After filepath.Join, verify the cleaned target is still under
+	//      clientRoot (defence-in-depth against unicode / NTFS weirdness).
+	if err := safeChunkPath(c.Path); err != nil {
+		return fmt.Errorf("unsafe chunk path %q: %w", c.Path, err)
+	}
 	targetPath := filepath.Join(p.clientRoot, c.Path)
+	rootAbs, _ := filepath.Abs(p.clientRoot)
+	tgtAbs, _ := filepath.Abs(targetPath)
+	if !strings.HasPrefix(tgtAbs+string(filepath.Separator), rootAbs+string(filepath.Separator)) && tgtAbs != rootAbs {
+		return fmt.Errorf("chunk target %q escapes client root", c.Path)
+	}
 
 	// Ensure parent directory exists
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
@@ -265,6 +312,11 @@ func (p *Patcher) verifyWrittenChunks(chunks []chunker.FileChunk) error {
 	for i, c := range chunks {
 		p.progress("verifying_chunks", int64(i), int64(len(chunks)), c.Path)
 
+		// Re-apply the path traversal guard (defence in depth — the manifest
+		// could have been tampered with between download and verify).
+		if err := safeChunkPath(c.Path); err != nil {
+			return fmt.Errorf("verify: unsafe path %q: %w", c.Path, err)
+		}
 		path := filepath.Join(p.clientRoot, c.Path)
 		f, err := os.Open(path)
 		if err != nil {

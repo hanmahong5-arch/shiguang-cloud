@@ -30,6 +30,10 @@ export function GetPrefs() {
   return window['go']['main']['App']['GetPrefs']();
 }
 
+export function GetVersion() {
+  return window['go']['main']['App']['GetVersion']();
+}
+
 export function LaunchGame(arg1) {
   return window['go']['main']['App']['LaunchGame'](arg1);
 }

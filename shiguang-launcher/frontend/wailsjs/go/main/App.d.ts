@@ -17,6 +17,8 @@ export function GetControlURL():Promise<string>;
 
 export function GetPrefs():Promise<main.Prefs>;
 
+export function GetVersion():Promise<main.VersionInfo>;
+
 export function LaunchGame(arg1:string):Promise<number>;
 
 export function Login(arg1:string,arg2:string,arg3:string):Promise<void>;

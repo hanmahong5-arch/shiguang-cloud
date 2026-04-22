@@ -14,6 +14,7 @@ import {
   GetBrand,
   SetServerCode,
   ClearServerCode,
+  GetVersion,
 } from '../wailsjs/go/main/App'
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
 import { useToast } from './components/Toast'
@@ -912,6 +913,12 @@ function SettingsScreen({ brand }: { brand: BrandConfig | null }) {
   const [controlURLTouched, setControlURLTouched] = useState(false)
   const [savingURL, setSavingURL] = useState(false)
   const [paths, setPaths] = useState<Record<string, string>>({})
+  const [version, setVersion] = useState<{
+    version: string
+    build_time: string
+    go_version: string
+    platform: string
+  } | null>(null)
   // 每个服务器路径的防抖保存 timer
   const pathTimers = useRef<Record<string, number>>({})
 
@@ -924,6 +931,11 @@ function SettingsScreen({ brand }: { brand: BrandConfig | null }) {
       })
       .catch((e: any) => {
         toast.error(`读取配置失败：${e?.message || e}`)
+      })
+    GetVersion()
+      .then((v: any) => setVersion(v))
+      .catch(() => {
+        // 版本查询失败不影响主流程，静默
       })
     // 组件卸载时清理未完成的 debounce
     return () => {
@@ -1095,6 +1107,34 @@ function SettingsScreen({ brand }: { brand: BrandConfig | null }) {
         </div>
         <div className="field-hint" style={{ marginLeft: 132, marginTop: 6 }}>
           切换将清除品牌主题，需重新输入邀请码连接。
+        </div>
+      </div>
+
+      {/* About —— 启动器版本信息（调试 / 升级判定用） */}
+      <div className="settings-section">
+        <h3>关于</h3>
+        <div className="about-grid">
+          <div className="about-row">
+            <span className="about-label">版本</span>
+            <span className="about-value mono">{version?.version ?? '—'}</span>
+          </div>
+          {version?.build_time && (
+            <div className="about-row">
+              <span className="about-label">构建时间</span>
+              <span className="about-value mono">{version.build_time}</span>
+            </div>
+          )}
+          <div className="about-row">
+            <span className="about-label">Go 版本</span>
+            <span className="about-value mono">{version?.go_version ?? '—'}</span>
+          </div>
+          <div className="about-row">
+            <span className="about-label">平台</span>
+            <span className="about-value mono">{version?.platform ?? '—'}</span>
+          </div>
+        </div>
+        <div className="field-hint" style={{ marginTop: 8 }}>
+          如遇异常请截图此信息并提供给管理员；会同时注明服务器代码与 Request ID。
         </div>
       </div>
     </div>

@@ -1,0 +1,130 @@
+# ShiguangCloud CI — Go workspace build/test + frontend build + security scan
+# Runner: ubuntu-latest (cost/speed optimized). Wails native build intentionally skipped (requires CGO + GTK).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save minutes
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Go workspace: build + vet + test (-race) across all modules declared in go.work
+  # ---------------------------------------------------------------------------
+  go:
+    name: Go (build/vet/test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools/ShiguangSuite
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ['1.22']
+    env:
+      GOWORK: on          # explicit workspace mode (matches go.work at repo root of suite)
+      CGO_ENABLED: '0'    # pure-Go build path; Wails/CGO excluded in CI
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5   # built-in module cache keyed on go.sum files
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+          cache-dependency-path: |
+            tools/ShiguangSuite/shared/go.sum
+            tools/ShiguangSuite/shiguang-agent/go.sum
+            tools/ShiguangSuite/shiguang-control/go.sum
+            tools/ShiguangSuite/shiguang-gate/go.sum
+            tools/ShiguangSuite/shiguang-hub/go.sum
+            tools/ShiguangSuite/shiguang-launcher/go.sum
+
+      - name: Sync workspace deps
+        run: go work sync
+
+      # Per-module vet + build + test; iterate to isolate failures per module
+      - name: Build / vet / test each module
+        run: |
+          set -euo pipefail
+          MODULES=(shared shiguang-agent shiguang-control shiguang-gate shiguang-hub shiguang-launcher)
+          for m in "${MODULES[@]}"; do
+            echo "::group::[$m] go vet"
+            (cd "$m" && go vet ./...)
+            echo "::endgroup::"
+            echo "::group::[$m] go build"
+            (cd "$m" && go build ./...)
+            echo "::endgroup::"
+            echo "::group::[$m] go test -race"
+            (cd "$m" && go test ./... -race -timeout 5m)
+            echo "::endgroup::"
+          done
+
+  # ---------------------------------------------------------------------------
+  # Frontend builds: launcher (Wails webview UI) + hub admin SPA
+  # Wails native shell is NOT built here — only the web assets are compiled.
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend (${{ matrix.app.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - { name: launcher, path: tools/ShiguangSuite/shiguang-launcher/frontend }
+          - { name: hub-admin, path: tools/ShiguangSuite/shiguang-hub/admin-spa }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            tools/ShiguangSuite/shiguang-launcher/frontend/package-lock.json
+            tools/ShiguangSuite/shiguang-hub/admin-spa/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.app.path }}
+        run: npm ci
+
+      - name: Build
+        working-directory: ${{ matrix.app.path }}
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Security scan (advisory; non-blocking)
+  # ---------------------------------------------------------------------------
+  security:
+    name: gosec (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run gosec
+        uses: securego/gosec@master
+        continue-on-error: true
+        with:
+          # Scan all Go modules under the suite; exclude vendored/generated
+          args: -quiet -exclude-dir=proto -exclude-dir=tmp ./tools/ShiguangSuite/...

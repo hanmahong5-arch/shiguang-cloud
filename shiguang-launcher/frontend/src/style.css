@@ -975,3 +975,37 @@ input:focus, select:focus {
 .network-banner-btn:disabled {
   opacity: 0.6;
 }
+
+/* ==================================================================
+ * About —— 版本信息展示
+ * ================================================================ */
+.about-grid {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  row-gap: 6px;
+  column-gap: 12px;
+  font-size: var(--fs-body-sm);
+}
+
+.about-row {
+  display: contents;
+}
+
+.about-label {
+  color: var(--color-text-dim);
+  letter-spacing: 0.5px;
+}
+
+.about-value {
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.about-value.mono {
+  font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+  font-size: var(--fs-caption);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  display: inline-block;
+}

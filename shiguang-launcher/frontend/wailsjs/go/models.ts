@@ -145,5 +145,24 @@ export namespace main {
 	    }
 	}
 
+	export class VersionInfo {
+	    version: string;
+	    build_time: string;
+	    go_version: string;
+	    platform: string;
+
+	    static createFrom(source: any = {}) {
+	        return new VersionInfo(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.build_time = source["build_time"];
+	        this.go_version = source["go_version"];
+	        this.platform = source["platform"];
+	    }
+	}
+
 }
 
